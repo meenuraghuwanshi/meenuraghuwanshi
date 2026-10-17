@@ -1,0 +1,470 @@
+"""
+Generates assets/profile-dark.svg and assets/profile-light.svg — the whole
+profile rendered as one scrolling terminal session, with live numbers pulled
+from GitHub's GraphQL API.
+
+Run by .github/workflows/dashboard.yml on a daily schedule. Needs a token
+with read access to public data — the Action's default GITHUB_TOKEN works;
+if it doesn't for your account, add a classic Personal Access Token (no
+scopes required) as a repo secret named ACCESS_TOKEN and it'll be preferred.
+
+Edit NAME / TAGLINE / ABOUT_LINES / STATUS_LINES / PROJECTS / STACK below to
+change the static content. The numbers in the "./analytics.sh --live" block
+are the only part computed from live data.
+"""
+
+import datetime
+import os
+import sys
+
+import requests
+
+GITHUB_USERNAME = os.environ.get("GH_USERNAME") or os.environ.get("GITHUB_REPOSITORY_OWNER")
+TOKEN = os.environ.get("ACCESS_TOKEN") or os.environ.get("GITHUB_TOKEN")
+
+if not GITHUB_USERNAME:
+    sys.exit("GH_USERNAME is not set")
+if not TOKEN:
+    sys.exit("No GitHub token available (set ACCESS_TOKEN or GITHUB_TOKEN)")
+
+API_URL = "https://api.github.com/graphql"
+HEADERS = {"Authorization": f"bearer {TOKEN}"}
+
+QUERY = """
+query($login: String!, $from: DateTime!, $to: DateTime!) {
+  user(login: $login) {
+    createdAt
+    contributionsCollection(from: $from, to: $to) {
+      contributionCalendar {
+        totalContributions
+        weeks {
+          contributionDays {
+            date
+            contributionCount
+          }
+        }
+      }
+    }
+  }
+}
+"""
+
+REPO_QUERY = """
+query($login: String!) {
+  user(login: $login) {
+    pinnedItems(first: 6, types: [REPOSITORY]) {
+      nodes {
+        ... on Repository {
+          name
+          description
+          languages(first: 5, orderBy: {field: SIZE, direction: DESC}) {
+            edges { node { name } }
+          }
+        }
+      }
+    }
+    repositories(first: 100, ownerAffiliations: [OWNER], isFork: false, privacy: PUBLIC, orderBy: {field: STARGAZERS, direction: DESC}) {
+      nodes {
+        name
+        description
+        languages(first: 10, orderBy: {field: SIZE, direction: DESC}) {
+          edges { size node { name } }
+        }
+      }
+    }
+  }
+}
+"""
+
+# ---- static content: edit this section for your own copy ------------------
+# (projects and tools come from your live GitHub data below, not from here)
+
+NAME = "Meenu Raghuwanshi"
+TAGLINE = "CSE student · Python & DSA · Web Development · AI / Data Science"
+
+STATUS_LINES = [
+    "Learning by building, one project at a time.",
+    "Exploring code, data, and creative ideas.",
+    "Always curious. Always improving.",
+]
+
+ABOUT_LINES = [
+    "I am a Computer Science student who enjoys solving problems and learning",
+    "through hands-on projects. I am exploring programming, web development,",
+    "data science, and AI while building my skills every day.",
+]
+
+CONTACT = "github.com/{user}"
+
+# ---- GitHub data ------------------------------------------------------------
+
+
+def run_query(login, start, end):
+    variables = {"login": login, "from": start, "to": end}
+    resp = requests.post(
+        API_URL, json={"query": QUERY, "variables": variables}, headers=HEADERS, timeout=30
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    if "errors" in data:
+        raise RuntimeError(data["errors"])
+    return data["data"]["user"]
+
+
+def fetch_all_days(login):
+    """The API only returns 1 year per call, so walk back year by year to createdAt."""
+    now = datetime.datetime.utcnow()
+    first = run_query(
+        login,
+        (now - datetime.timedelta(days=365)).isoformat() + "Z",
+        now.isoformat() + "Z",
+    )
+    created_at = datetime.datetime.strptime(first["createdAt"][:19], "%Y-%m-%dT%H:%M:%S")
+
+    all_days = {}
+    total_contributions = 0
+    cursor_end = now
+
+    while cursor_end > created_at:
+        cursor_start = max(created_at, cursor_end - datetime.timedelta(days=365))
+        chunk = run_query(login, cursor_start.isoformat() + "Z", cursor_end.isoformat() + "Z")
+        calendar = chunk["contributionsCollection"]["contributionCalendar"]
+        total_contributions += calendar["totalContributions"]
+        for week in calendar["weeks"]:
+            for day in week["contributionDays"]:
+                all_days[day["date"]] = day["contributionCount"]
+        cursor_end = cursor_start - datetime.timedelta(days=1)
+
+    return total_contributions, all_days, created_at
+
+
+def compute_streaks(all_days):
+    dates_sorted = sorted(all_days.keys())
+    today = datetime.date.today()
+
+    current_streak = 0
+    d = today
+    while all_days.get(d.isoformat(), 0) > 0:
+        current_streak += 1
+        d -= datetime.timedelta(days=1)
+
+    longest_streak, longest_start, longest_end = 0, None, None
+    run_len, run_start, prev_date = 0, None, None
+
+    for date_str in dates_sorted:
+        count = all_days[date_str]
+        d_obj = datetime.date.fromisoformat(date_str)
+        if count > 0:
+            if prev_date is not None and (d_obj - prev_date).days == 1:
+                run_len += 1
+            else:
+                run_len = 1
+                run_start = d_obj
+            if run_len > longest_streak:
+                longest_streak, longest_start, longest_end = run_len, run_start, d_obj
+            prev_date = d_obj
+        else:
+            prev_date = None
+            run_len = 0
+
+    return current_streak, longest_streak, longest_start, longest_end
+
+
+def fmt(d):
+    return d.strftime("%b %d, %Y") if d else "-"
+
+
+def truncate(s, n):
+    s = (s or "").strip()
+    return s if len(s) <= n else s[: n - 1].rstrip() + "…"
+
+
+def lang_names(repo, limit=5):
+    return [e["node"]["name"] for e in repo.get("languages", {}).get("edges", [])[:limit]]
+
+
+def fetch_projects_and_stack(login, max_projects=3, max_stack=9):
+    """Pulls pinned repos (or top-starred ones if nothing is pinned) for the
+    projects list, and aggregates language bytes across your public repos
+    for the tools list — both live, nothing hand-typed."""
+    resp = requests.post(
+        API_URL, json={"query": REPO_QUERY, "variables": {"login": login}}, headers=HEADERS, timeout=30
+    )
+    resp.raise_for_status()
+    data = resp.json()
+    if "errors" in data:
+        raise RuntimeError(data["errors"])
+    user = data["data"]["user"]
+
+    pinned = [n for n in user["pinnedItems"]["nodes"] if n]
+    repos = user["repositories"]["nodes"]
+
+    totals = {}
+    for r in repos:
+        for e in r["languages"]["edges"]:
+            name = e["node"]["name"]
+            totals[name] = totals.get(name, 0) + e["size"]
+    stack = [name.lower() for name, _ in sorted(totals.items(), key=lambda kv: kv[1], reverse=True)[:max_stack]]
+
+    source = pinned if pinned else repos
+    projects = []
+    for r in source[:max_projects]:
+        desc = r.get("description") or "no description set"
+        tags = " · ".join(l.lower() for l in lang_names(r)) or "-"
+        projects.append((truncate(r["name"], 24), truncate(desc, 66), tags))
+
+    if not projects:
+        projects = [("no-repos-yet", "nothing public to show yet", "-")]
+    if not stack:
+        stack = ["-"]
+
+    return projects, stack
+
+
+# ---- terminal / CRT rendering ----------------------------------------------
+
+FONT = "Consolas, Monaco, 'Courier New', monospace"
+
+THEMES = {
+    "dark": dict(
+        bg="#13091f",
+        chrome_bg="#21102f",
+        border="#633a7d",
+        text_dim="#b08ac8",
+        text_mid="#f0c9ff",
+        green="#ff75c8",
+        amber="#c9a0ff",
+        scan="rgba(255,117,200,0.045)",
+        vignette=0.28,
+        glow=3.0,
+    ),
+    "light": dict(
+        bg="#fff7fd",
+        chrome_bg="#f7e8f7",
+        border="#e5b7df",
+        text_dim="#9b6c9b",
+        text_mid="#623b70",
+        green="#c0268d",
+        amber="#8546c8",
+        scan="rgba(192,38,141,0.025)",
+        vignette=0.04,
+        glow=1.1,
+    ),
+}
+
+
+def esc(s):
+    return str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+class Card:
+    def __init__(self, theme, username, width=760):
+        self.t = THEMES[theme]
+        self.username = username
+        self.width = width
+        self.left = 24
+        self.y = 54
+        self.body = []
+
+    def prompt(self, cmd):
+        self.body.append(
+            f'<text x="{self.left}" y="{self.y}" font-family="{FONT}" font-size="13" '
+            f'fill="{self.t["text_mid"]}">$ {esc(cmd)}</text>'
+        )
+        self.y += 24
+
+    def line(self, text, color=None, size=12, indent=0):
+        color = color or self.t["text_dim"]
+        self.body.append(
+            f'<text x="{self.left + indent}" y="{self.y}" font-family="{FONT}" '
+            f'font-size="{size}" fill="{color}">{esc(text)}</text>'
+        )
+        self.y += 20
+
+    def gap(self, px=10):
+        self.y += px
+
+    def divider(self):
+        self.gap(4)
+        self.body.append(
+            f'<line x1="0" y1="{self.y}" x2="{self.width}" y2="{self.y}" '
+            f'stroke="{self.t["border"]}" stroke-width="1" />'
+        )
+        self.gap(18)
+
+    def stats(self, items):
+        col = self.width / len(items)
+        top = self.y
+        for i, (value, label, sub, color) in enumerate(items):
+            cx = col * i + col / 2
+            self.body.append(
+                f'<text x="{cx:.1f}" y="{top + 38}" text-anchor="middle" font-family="{FONT}" '
+                f'font-weight="700" font-size="28" fill="{color}" filter="url(#glow)">{esc(value)}</text>'
+            )
+            self.body.append(
+                f'<text x="{cx:.1f}" y="{top + 60}" text-anchor="middle" font-family="{FONT}" '
+                f'font-size="11" fill="{self.t["text_mid"]}">{esc(label)}</text>'
+            )
+            self.body.append(
+                f'<text x="{cx:.1f}" y="{top + 77}" text-anchor="middle" font-family="{FONT}" '
+                f'font-size="10" fill="{self.t["text_dim"]}">{esc(sub)}</text>'
+            )
+            if i > 0:
+                self.body.append(
+                    f'<line x1="{col * i:.1f}" y1="{top + 6}" x2="{col * i:.1f}" y2="{top + 90}" '
+                    f'stroke="{self.t["border"]}" stroke-width="1" />'
+                )
+        self.y = top + 100
+
+    def project(self, name, desc, tags):
+        self.body.append(
+            f'<text x="{self.left}" y="{self.y}" font-family="{FONT}" font-size="11" '
+            f'fill="{self.t["text_dim"]}">drwxr-xr-x</text>'
+        )
+        self.body.append(
+            f'<text x="{self.left + 108}" y="{self.y}" font-family="{FONT}" font-weight="700" '
+            f'font-size="12" fill="{self.t["green"]}">{esc(name)}/</text>'
+        )
+        self.body.append(
+            f'<text x="{self.left + 250}" y="{self.y}" font-family="{FONT}" font-size="11" '
+            f'fill="{self.t["text_mid"]}">{esc(desc)}</text>'
+        )
+        self.y += 17
+        self.body.append(
+            f'<text x="{self.left + 250}" y="{self.y}" font-family="{FONT}" font-size="10" '
+            f'fill="{self.t["text_dim"]}">{esc(tags)}</text>'
+        )
+        self.y += 24
+
+    def cycling_status(self, lines, total_dur=9):
+        seg = total_dur / len(lines)
+        for i, text in enumerate(lines):
+            start = (i * seg) / total_dur
+            end = ((i + 1) * seg) / total_dur
+            key_times = f"0;{start:.4f};{start:.4f};{end:.4f};{end:.4f};1"
+            base_opacity = 1 if i == 0 else 0
+            self.body.append(
+                f'<text x="{self.left}" y="{self.y}" font-family="{FONT}" font-size="12" '
+                f'fill="{self.t["green"]}" opacity="{base_opacity}">&gt; {esc(text)}'
+                f'<animate attributeName="opacity" values="0;0;1;1;0;0" '
+                f'keyTimes="{key_times}" dur="{total_dur}s" repeatCount="indefinite" /></text>'
+            )
+        self.y += 22
+
+    def cursor_prompt(self, text):
+        self.body.append(
+            f'<text x="{self.left}" y="{self.y}" font-family="{FONT}" font-size="13" '
+            f'fill="{self.t["text_mid"]}">{esc(text)}</text>'
+        )
+        cx = self.left + len(text) * 7.4
+        self.body.append(
+            f'<rect x="{cx:.1f}" y="{self.y - 12}" width="8" height="14" fill="{self.t["green"]}">'
+            f'<animate attributeName="opacity" values="1;1;0;0" keyTimes="0;0.5;0.5;1" '
+            f'dur="1.1s" repeatCount="indefinite" /></rect>'
+        )
+        self.y += 20
+
+    def render(self):
+        height = self.y + 24
+        t = self.t
+        body = "\n    ".join(self.body)
+        return f'''<svg width="{self.width}" height="{height}" viewBox="0 0 {self.width} {height}" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="{t["glow"]}" result="blur" />
+      <feMerge><feMergeNode in="blur" /><feMergeNode in="SourceGraphic" /></feMerge>
+    </filter>
+    <pattern id="scan" width="3" height="3" patternUnits="userSpaceOnUse">
+      <rect width="3" height="1" fill="{t["scan"]}" />
+    </pattern>
+    <radialGradient id="vignette" cx="50%" cy="40%" r="80%">
+      <stop offset="55%" stop-color="#000000" stop-opacity="0" />
+      <stop offset="100%" stop-color="#000000" stop-opacity="{t["vignette"]}" />
+    </radialGradient>
+    <clipPath id="clip"><rect x="0.5" y="0.5" width="{self.width - 1}" height="{height - 1}" rx="10" /></clipPath>
+  </defs>
+  <g clip-path="url(#clip)">
+    <rect x="0" y="0" width="{self.width}" height="{height}" fill="{t["bg"]}" />
+    <rect x="0" y="0" width="{self.width}" height="32" fill="{t["chrome_bg"]}" />
+    <circle cx="18" cy="16" r="5" fill="#ff5f56" />
+    <circle cx="36" cy="16" r="5" fill="#ffbd2e" />
+    <circle cx="54" cy="16" r="5" fill="#27c93f" />
+    <text x="78" y="20" font-family="{FONT}" font-size="12" fill="{t["text_dim"]}">{esc(self.username)}@github:~$ ./profile.sh</text>
+    <line x1="0" y1="32" x2="{self.width}" y2="32" stroke="{t["border"]}" stroke-width="1" />
+    {body}
+    <rect x="0" y="0" width="{self.width}" height="{height}" fill="url(#scan)" />
+    <rect x="0" y="0" width="{self.width}" height="{height}" fill="url(#vignette)" />
+  </g>
+  <rect x="0.5" y="0.5" width="{self.width - 1}" height="{height - 1}" rx="10" fill="none" stroke="{t["border"]}" stroke-width="1" />
+</svg>
+'''
+
+
+def build_profile(theme, username, total, current, longest, range_start, longest_start, longest_end, projects, stack):
+    t = THEMES[theme]
+    c = Card(theme, username)
+
+    c.prompt("whoami")
+    c.line(f"{NAME} - {TAGLINE}", color=t["green"], size=13)
+    c.gap(8)
+    c.cycling_status(STATUS_LINES)
+    c.gap(4)
+
+    c.prompt("cat about.md")
+    for l in ABOUT_LINES:
+        c.line(l)
+    c.divider()
+
+    c.prompt("./analytics.sh --live")
+    c.gap(6)
+    longest_range = f"{fmt(longest_start)} - {fmt(longest_end)}" if longest_start else "-"
+    c.stats(
+        [
+            (f"{total:,}", "# total_contributions", f"{range_start} to now", t["green"]),
+            (str(current), "# current_streak", f"as of {datetime.date.today().strftime('%b %d')}", t["amber"]),
+            (str(longest), "# longest_streak", longest_range, t["green"]),
+        ]
+    )
+    c.divider()
+
+    c.prompt("ls -la ~/projects")
+    c.gap(6)
+    for name, desc, tags in projects:
+        c.project(name, desc, tags)
+    c.divider()
+
+    c.prompt("cat stack.txt")
+    c.line(", ".join(stack))
+    c.divider()
+
+    c.prompt("cat contact.txt")
+    c.line(CONTACT.format(user=username))
+    c.gap(14)
+
+    c.cursor_prompt(f"guest@{username}:~$ ")
+
+    return c.render()
+
+
+def main():
+    total, all_days, created_at = fetch_all_days(GITHUB_USERNAME)
+    current, longest, longest_start, longest_end = compute_streaks(all_days)
+    range_start = created_at.strftime("%b %Y")
+    projects, stack = fetch_projects_and_stack(GITHUB_USERNAME)
+
+    os.makedirs("assets", exist_ok=True)
+    for theme in ("dark", "light"):
+        svg = build_profile(
+            theme, GITHUB_USERNAME, total, current, longest,
+            range_start, longest_start, longest_end, projects, stack,
+        )
+        with open(f"assets/profile-{theme}.svg", "w") as f:
+            f.write(svg)
+
+    print(f"total={total} current_streak={current} longest_streak={longest}")
+    print(f"projects={[p[0] for p in projects]}")
+    print(f"stack={stack}")
+
+
+if __name__ == "__main__":
+    main()
