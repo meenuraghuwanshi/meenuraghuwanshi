@@ -32,34 +32,34 @@
     <text x="24" y="196" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="12" fill="#9b6c9b">data science, and AI while building my skills every day.</text>
     <line x1="0" y1="220" x2="760" y2="220" stroke="#e5b7df" stroke-width="1" />
     <text x="24" y="238" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="13" fill="#623b70">$ ./analytics.sh --live</text>
-    <text x="126.7" y="306" text-anchor="middle" font-family="Consolas, Monaco, 'Courier New', monospace" font-weight="700" font-size="28" fill="#c0268d" filter="url(#glow)">8</text>
+    <text x="126.7" y="306" text-anchor="middle" font-family="Consolas, Monaco, 'Courier New', monospace" font-weight="700" font-size="28" fill="#c0268d" filter="url(#glow)">10</text>
     <text x="126.7" y="328" text-anchor="middle" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="11" fill="#623b70"># total_contributions</text>
     <text x="126.7" y="345" text-anchor="middle" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="10" fill="#9b6c9b">Jun 2026 to now</text>
     <text x="380.0" y="306" text-anchor="middle" font-family="Consolas, Monaco, 'Courier New', monospace" font-weight="700" font-size="28" fill="#8546c8" filter="url(#glow)">0</text>
     <text x="380.0" y="328" text-anchor="middle" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="11" fill="#623b70"># current_streak</text>
-    <text x="380.0" y="345" text-anchor="middle" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="10" fill="#9b6c9b">as of Oct 20</text>
+    <text x="380.0" y="345" text-anchor="middle" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="10" fill="#9b6c9b">as of Oct 21</text>
     <line x1="253.3" y1="274" x2="253.3" y2="358" stroke="#e5b7df" stroke-width="1" />
-    <text x="633.3" y="306" text-anchor="middle" font-family="Consolas, Monaco, 'Courier New', monospace" font-weight="700" font-size="28" fill="#c0268d" filter="url(#glow)">3</text>
+    <text x="633.3" y="306" text-anchor="middle" font-family="Consolas, Monaco, 'Courier New', monospace" font-weight="700" font-size="28" fill="#c0268d" filter="url(#glow)">4</text>
     <text x="633.3" y="328" text-anchor="middle" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="11" fill="#623b70"># longest_streak</text>
-    <text x="633.3" y="345" text-anchor="middle" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="10" fill="#9b6c9b">Oct 17, 2026 - Oct 19, 2026</text>
+    <text x="633.3" y="345" text-anchor="middle" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="10" fill="#9b6c9b">Oct 17, 2026 - Oct 20, 2026</text>
     <line x1="506.7" y1="274" x2="506.7" y2="358" stroke="#e5b7df" stroke-width="1" />
     <line x1="0" y1="372" x2="760" y2="372" stroke="#e5b7df" stroke-width="1" />
     <text x="24" y="390" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="13" fill="#623b70">$ ls -la ~/projects</text>
     <text x="24" y="420" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="11" fill="#9b6c9b">drwxr-xr-x</text>
-    <text x="132" y="420" font-family="Consolas, Monaco, 'Courier New', monospace" font-weight="700" font-size="12" fill="#c0268d">meenuraghuwanshi/</text>
-    <text x="274" y="420" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="11" fill="#623b70">no description set</text>
-    <text x="274" y="437" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="10" fill="#9b6c9b">python</text>
+    <text x="132" y="420" font-family="Consolas, Monaco, 'Courier New', monospace" font-weight="700" font-size="12" fill="#c0268d">StaffSync-Modern-Human-…/</text>
+    <text x="274" y="420" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="11" fill="#623b70">A full-stack MERN application for human resource management with…</text>
+    <text x="274" y="437" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="10" fill="#9b6c9b">javascript · css · typescript · html</text>
     <text x="24" y="461" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="11" fill="#9b6c9b">drwxr-xr-x</text>
-    <text x="132" y="461" font-family="Consolas, Monaco, 'Courier New', monospace" font-weight="700" font-size="12" fill="#c0268d">BuyTogether---PyData-Ha…/</text>
+    <text x="132" y="461" font-family="Consolas, Monaco, 'Courier New', monospace" font-weight="700" font-size="12" fill="#c0268d">meenuraghuwanshi/</text>
     <text x="274" y="461" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="11" fill="#623b70">no description set</text>
-    <text x="274" y="478" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="10" fill="#9b6c9b">-</text>
+    <text x="274" y="478" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="10" fill="#9b6c9b">python</text>
     <text x="24" y="502" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="11" fill="#9b6c9b">drwxr-xr-x</text>
-    <text x="132" y="502" font-family="Consolas, Monaco, 'Courier New', monospace" font-weight="700" font-size="12" fill="#c0268d">backend/</text>
+    <text x="132" y="502" font-family="Consolas, Monaco, 'Courier New', monospace" font-weight="700" font-size="12" fill="#c0268d">BuyTogether---PyData-Ha…/</text>
     <text x="274" y="502" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="11" fill="#623b70">no description set</text>
-    <text x="274" y="519" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="10" fill="#9b6c9b">javascript</text>
+    <text x="274" y="519" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="10" fill="#9b6c9b">-</text>
     <line x1="0" y1="547" x2="760" y2="547" stroke="#e5b7df" stroke-width="1" />
     <text x="24" y="565" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="13" fill="#623b70">$ cat stack.txt</text>
-    <text x="24" y="589" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="12" fill="#9b6c9b">javascript, python, batchfile, html</text>
+    <text x="24" y="589" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="12" fill="#9b6c9b">javascript, css, python, typescript, html, batchfile</text>
     <line x1="0" y1="613" x2="760" y2="613" stroke="#e5b7df" stroke-width="1" />
     <text x="24" y="631" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="13" fill="#623b70">$ cat contact.txt</text>
     <text x="24" y="655" font-family="Consolas, Monaco, 'Courier New', monospace" font-size="12" fill="#9b6c9b">github.com/meenuraghuwanshi</text>
